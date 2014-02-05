@@ -6,6 +6,7 @@ Created on Sat Jan 25 15:04:45 2014
 """
 
 import numpy as np
+import scipy as sp
 
 class Graph(dict):
     def __init__(self,vs= [],es = []):
@@ -15,19 +16,29 @@ class Graph(dict):
             self.add_edge(e)
             
     def add_vertex(self,v):
-        self[v] = {}
+        #self[v] = {}
+        self.setdefault(v,{})
         
     def add_edge(self,e):
         v,w = e.getVertex()        
         self[v][w] = e
         self[w][v] = e
         
+class DirectedGraph(Graph):
+    def add_edge(self,e,s):
+        v,w = e.getVertex()
+        if v == s:        
+            self[v][w] = e
+        else:
+            self[w][v] = e
+        
         
         
 class Vertex(object):
-    def __init__(self,label = '',func = sum):
+    def __init__(self,label = '',func = sum ):
         self.label = label
         self.func = func
+        self.value = 0
         self.__str__ == self.__repr__
         
     def __repr__(self):
@@ -37,8 +48,11 @@ class Vertex(object):
     def active(self,para):
         return self.func(para)
         
+    def update(self,para):
+        self.value = self.func(para)
+        
 class Edge(object):
-    def __init__(self,v1,v2,value = 0):
+    def __init__(self,v1,v2,value = 1):
         self.edge = tuple([v1,v2])
         self.value = value
         
@@ -63,7 +77,7 @@ class SmallWorldGraph(object):
         
         #加入节点
         for i in range(num):
-            self.vs.add(Vertex(str(i)))
+            self.vs.add(Vertex(str(i),sigmoid))
             
         
         #构造正则图  
@@ -115,17 +129,47 @@ def findPathLength(graph,v1,v2):
 def findAverLength(graph):
     vs = graph.keys()
     distances = []
+    count = 0.0
+    nf = 0.0
     for i in range(len(vs)):
         for j in range(len(vs)):
+            count += 1
             dis = findPathLength(graph,vs[i],vs[j])
             if dis:
                 distances.append(dis)
-    return np.sum(distances)/len(distances)
-        
+            else:
+                nf += 1.0
+    return np.sum(distances)*1.0/len(distances),nf/count
+    
+    
+    
+def sigmoid(x):
+    x = np.sum(x)
+    return 1./(np.e**-x + 1.)
+    
+
                 
                 
         
+def buildDirectedGraph(ugraph,o_vertexs):
+        dgraph = DirectedGraph()
+        fringe = o_vertexs
+        visited = set()
+        while(len(fringe)):
+            new_fringe = set()
+            for v in fringe:
+                dgraph.add_vertex(v)
+                for v2 in ugraph[v]:
+                    if v2 in visited:
+                        continue
+                    new_fringe.add(v2)
+                    dgraph.add_vertex(v2)
+                    e = ugraph[v][v2]
+                    dgraph.add_edge(e,v)
+                visited.add(v)
+            fringe = new_fringe
         
+        return dgraph        
         
         
     
@@ -139,13 +183,14 @@ if __name__ == "__main__":
     #g = Graph([v,w],[e])
     
     #print g
-    sw = SmallWorldGraph(300,2,0.5)
+    sw = SmallWorldGraph(30,3,0.4)
     #print sw.graph
 #    vs = list(sw.vs)
 #    for v1 in vs:
 #        for v2 in vs:
 #            print v1,v2
 #            print findPathLength(sw.graph,v1,v2)
+    dgraph = buildDirectedGraph(sw.graph,np.random.choice(list(sw.vs),3,replace = False))
     print findAverLength(sw.graph)
     
         
