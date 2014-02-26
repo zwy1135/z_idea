@@ -7,8 +7,9 @@ Created on Tue Feb 04 16:05:46 2014
 
 
 
-from graph_rebuild import *
+from nn_type import *
 from graph_drawer import *
+from methods import *
 
 
 def buildDirectedGraph(dgraph,start,end):
@@ -39,8 +40,9 @@ def buildDirectedGraph(dgraph,start,end):
     
 
 class NN(DirectedGraph):
-    def __init__(self,num_in,num_out,num_hide,k,p,ntype = SmallWorldGraph):
+    def __init__(self,num_in,num_out,num_hide,k,p,ntype = NN_SW):
         DirectedGraph.__init__(self)
+        num_hide = max(num_connect*num_in,num_connect*num_out,num_hide)
         UnDirectedGraph = ntype(num_hide,k,p)
         
         
@@ -49,21 +51,7 @@ class NN(DirectedGraph):
         
         
         
-        vs = list(UnDirectedGraph.vs)
-        
-        ivs = np.random.choice(vs,3*num_in,replace = False)
-        ovs = [v for v in vs if not v in ivs][:3*num_out]
-        
-        for v in self.inputVertex+self.outputVertex:
-            UnDirectedGraph.add_vertex(v)
-        
-        for v1 in self.inputVertex:
-            for v2 in np.random.choice(ivs,3,replace = False):
-                UnDirectedGraph.add_edge(Edge(v1,v2))
-                
-        for v1 in self.outputVertex:
-            for v2 in np.random.choice(ovs,3,replace = False):
-                UnDirectedGraph.add_edge(Edge(v1,v2))
+        UnDirectedGraph.addIOVertex(self.inputVertex,self.outputVertex)
 
                 
         buildDirectedGraph(self,self.outputVertex,self.inputVertex)
@@ -71,12 +59,14 @@ class NN(DirectedGraph):
     def active(self,data):
         for v in self.vs:
             v.isupdated = False
+        data = data[:]
         data.reverse()
         for v in self.inputVertex:
             v.update(data.pop())
-        for v in self.outputVertex:
-            v.update()
-        return [v.value for v in self.outputVertex]
+        return [v.active() for v in self.outputVertex]
+        
+    def fit(self,data,label,method):
+        method(self,data,label)
         
         
 
@@ -89,10 +79,17 @@ class NN(DirectedGraph):
 
 
 if __name__=="__main__":
-    nn = NN(3,1,500,2,0.1)
+    nn = NN(2,1,20,3,0.5)
     #print findAverLength(nn)
-    #output_directed_to_pajek(nn.outputVertex)
-    print nn.active([100,100,100])
+    output_directed_to_pajek(nn.outputVertex)
+    data = []
+    label = []
+    for x in range(1):
+        for y in range(1):
+            data.append([x,y])
+            label.append([x and y])
+    #print nn.active([100,100,100])
+    nn.fit(data,label,bp_method)
 
         
         

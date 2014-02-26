@@ -52,7 +52,7 @@ def output_directed_to_pajek(start,filename = 'directed.net'):
     
     f = file(filename,'w')
     print >>f,'*Vertices %d'%len(table)
-    print >>f,vs
+    print >>f,vs[:-1]
     print >>f,'*Arcs'
     print >>f,es
     f.close()

@@ -1,199 +1,228 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sat Jan 25 15:04:45 2014
+Created on Tue Feb 04 17:51:20 2014
 
 @author: wy
 """
-
 import numpy as np
-import scipy as sp
 
-class Graph(dict):
-    def __init__(self,vs= [],es = []):
+
+def sigmoid(x):
+    x = np.sum(x)
+    return 1./(np.e**-x + 1)  
+
+
+class Graph(object):
+    def __init__(self,vs = [],es = []):
+        self.vs = set()
+        self.es = set()
         for v in vs:
             self.add_vertex(v)
         for e in es:
             self.add_edge(e)
             
     def add_vertex(self,v):
-        #self[v] = {}
-        self.setdefault(v,{})
+        self.vs.add(v)
+        
+    def remove_vertex(self,v):
+        self.vs.remove(v)
+        for v1 in self.vs:
+            v1.removeEdge(v)
         
     def add_edge(self,e):
-        v,w = e.getVertex()        
-        self[v][w] = e
-        self[w][v] = e
+        self.es.add(e)
+        v,w = e.getVertex()
+        v.setEdge(w,e)
+        w.setEdge(v,e)
+    
+    def remove_edge(self,e):
+        try:
+            self.es.remove(e)
+        except:
+            pass
+        v,w = e.getVertex()
+        v.removeEdge(w)
+        w.removeEdge(v)
+        
         
 class DirectedGraph(Graph):
     def add_edge(self,e,s):
+        self.es.add(e)
         v,w = e.getVertex()
-        if v == s:        
-            self[v][w] = e
+        if v==s:
+            v.setEdge(w,e)
+            
         else:
-            self[w][v] = e
+            w.setEdge(v,w)
+            
+    
         
-        
-        
+            
+            
 class Vertex(object):
-    def __init__(self,label = '',func = sum ):
+    def __init__(self,label = '',func = sigmoid):
         self.label = label
         self.func = func
-        self.value = 0
+        self.value = 0.0
+        self.edges = {}
+        self.isupdated = False
         self.__str__ == self.__repr__
         
     def __repr__(self):
         return "Vertex %s"%self.label
+            
+        
+    def setEdge(self,w,e):
+        self.edges[w] = e
+        
+    def removeEdge(self,w):
+        try:        
+            del self.edges[w]
+        except:
+            pass
+            #print 'Nothing to delete.'
+            
+    def getEdges(self):
+        return self.edges
+    
+    
+        
+    def active(self):
+        if self.func == None or self.isupdated:
+            return self.value
+        pairs = self.edges.items()
+        para = [p[0].active()*p[1].getValue() for p in pairs]
+        self.value = self.func(para)
+        self.isupdated = True
+        return self.value
+
+    def update(self,value = None):
+        if not value == None:
+            self.value = value
+        else:
+            self.active() 
         
     
-    def active(self,para):
-        return self.func(para)
         
-    def update(self,para):
-        self.value = self.func(para)
         
 class Edge(object):
     def __init__(self,v1,v2,value = 1):
         self.edge = tuple([v1,v2])
         self.value = value
+        self.__str__ == self.__repr__
         
     def __repr__(self):
         return "Edge(%s,%s)"%(repr(self.edge[0]),repr(self.edge[1]))
         
-    __str__ =__repr__
-    
     def getVertex(self):
         return self.edge
+        
+    def setValue(self,value):
+        self.value = value
+        
+    def getValue(self):
+        return self.value
+        
     
     
     
     
-    
-    
-class SmallWorldGraph(object):
+class SmallWorldGraph(Graph):
     def __init__(self,num,k,p):
-        self.vs = set()
-        self.es = set()
-        
-        
-        #加入节点
+        Graph.__init__(self)
+        #add vertex
         for i in range(num):
-            self.vs.add(Vertex(str(i),sigmoid))
-            
+            self.add_vertex(Vertex(str(i)))
         
-        #构造正则图  
-        vs = list(self.vs)          
+        
+        #构造正则图
+        vs = list(self.vs)
         for i in range(num):
             for j in range(1,k + 1):
                 idx = i+j
-                if idx>=num:
+                if idx >= num:
                     idx -= num
+                self.add_edge(Edge(vs[i],vs[idx]))
                 
-                self.es.add(Edge(vs[i],vs[idx]))
                 
         #随机连边
         removelist = []
         for e in self.es:
             if np.random.random()<p:
+                #print '<'
                 removelist.append(e)
-                
         for e in removelist:
-            self.es.remove(e)
-            i1,i2 = np.random.randint(0,num,2)
-            self.es.add(Edge(vs[i1],vs[i2]))
+            self.remove_edge(e)
+            v1,v2 = np.random.choice(vs,2,replace = False)
+            self.add_edge(Edge(v1,v2))
             
-        self.graph = Graph(self.vs,self.es)
+            
         
-        
-        
-        
-def findPathLength(graph,v1,v2):
-    distance = 0
+           
+def findPathLength(s,t):
+    fringe = [s]
+    length = 0
     visited = set()
-    fring = set([v1])
-    if v1 == v2:
-        return 0
-    while 1:
-        newfring = set()
-        distance += 1
-        for v in fring:
-            for nv in graph[v].keys():
-                if nv == v2:
-                    return distance
-                if not nv in visited:
-                    newfring.add(nv)
-                    visited.add(nv)
-        fring = newfring
-        if len(fring)==0:
-            return None
-            
+    while(len(fringe)):
+        length += 1
+        new_fringe = set()
+        for v in fringe:
+            for v1 in v.edges:
+                if v1 == t:
+                    return length
+                if v1 in visited:
+                    continue
+                new_fringe.add(v1)
+            visited.add(v)
+        fringe = new_fringe
+    return None
+    
 def findAverLength(graph):
-    vs = graph.keys()
-    distances = []
-    count = 0.0
-    nf = 0.0
+    total = 0.0
+    count = 0
+    notfound = 0
+    vs = list(graph.vs)
     for i in range(len(vs)):
-        for j in range(len(vs)):
+        for j in range(1,len(vs)):
+            l = findPathLength(vs[i],vs[j])
+            if l == None:
+                notfound +=1
+                continue
+            total += l
             count += 1
-            dis = findPathLength(graph,vs[i],vs[j])
-            if dis:
-                distances.append(dis)
-            else:
-                nf += 1.0
-    return np.sum(distances)*1.0/len(distances),nf/count
+    return total/count,count,total,notfound
     
     
     
-def sigmoid(x):
-    x = np.sum(x)
-    return 1./(np.e**-x + 1.)
     
+        
+    
+    
+    
+                  
 
-                
-                
-        
-def buildDirectedGraph(ugraph,o_vertexs):
-        dgraph = DirectedGraph()
-        fringe = o_vertexs
-        visited = set()
-        while(len(fringe)):
-            new_fringe = set()
-            for v in fringe:
-                dgraph.add_vertex(v)
-                for v2 in ugraph[v]:
-                    if v2 in visited:
-                        continue
-                    new_fringe.add(v2)
-                    dgraph.add_vertex(v2)
-                    e = ugraph[v][v2]
-                    dgraph.add_edge(e,v)
-                visited.add(v)
-            fringe = new_fringe
-        
-        return dgraph        
         
         
-    
-    
-    
-    
-if __name__ == "__main__":
-    #v = Vertex('v')
-    #w = Vertex("w")
-    #e = Edge(v,w)
-    #g = Graph([v,w],[e])
-    
-    #print g
-    sw = SmallWorldGraph(30,3,0.4)
-    #print sw.graph
-#    vs = list(sw.vs)
-#    for v1 in vs:
-#        for v2 in vs:
-#            print v1,v2
-#            print findPathLength(sw.graph,v1,v2)
-    dgraph = buildDirectedGraph(sw.graph,np.random.choice(list(sw.vs),3,replace = False))
-    print findAverLength(sw.graph)
-    
+if __name__=="__main__":
+    sw = SmallWorldGraph(30,3,0.5)
+    vs = sw.vs
+    del sw
+    print vs
         
-    
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         
         
